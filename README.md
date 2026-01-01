@@ -1,181 +1,96 @@
-# Ollama Chatbot
+# Gemini Chatbot
 
-A JavaScript chatbot powered by Ollama and the Gemma3:12B language model.
+A JavaScript chatbot powered by Google Gemini API.
 
 ## Features
 
-- 🤖 Real-time chat interface with Ollama
+- 🤖 Real-time chat interface with Gemini
 - 💬 Conversation history management
-- 🎨 Modern, responsive UI
+- 🎨 Modern, responsive UI (Gemini-inspired theme)
 - 📱 Mobile-friendly design
-- ⚡ Fast inference with Gemma3:12B model
 - 🔄 Clear conversation history
-- 🎯 Status indicator for Ollama connection
+- 🎯 Status indicator for Gemini connection
 
 ## Prerequisites
 
-Before running this chatbot, you need to have:
+- Node.js 16+ (recommend latest LTS)
+- A Google AI Studio API key with access to Gemini (e.g., `gemini-2.5-flash`, `gemini-2.5-pro`)
 
-1. **Node.js** (v14 or higher) - [Download here](https://nodejs.org/)
-2. **Ollama** - [Download here](https://ollama.ai/)
-3. **Gemma3:12B model** pulled in Ollama
+## Setup
 
-## Installation
-
-### 1. Install Dependencies
+1) Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Download the Gemma3:12B Model
+2) Configure environment
 
-Open a terminal and run:
+Create `.env` (use `.env.example` as a template):
 
-```bash
-ollama pull gemma3:12b
+```env
+PORT=3000
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
-This will download and setup the Gemma3:12B model (approximately 12GB).
+> Keep your real API key in `.env`; never commit it. `.gitignore` already excludes `.env`.
 
-### 3. Start Ollama
-
-In a separate terminal, start the Ollama server:
-
-```bash
-ollama serve
-```
-
-By default, Ollama runs on `http://localhost:11434`
-
-### 4. Start the Chatbot Server
+3) Run the app
 
 ```bash
 npm start
 ```
 
-For development with auto-reload:
+Open http://localhost:3000 and chat.
 
-```bash
-npm run dev
-```
+## Environment Variables
 
-## Configuration
-
-You can configure the chatbot via environment variables. Create a `.env` file in the root directory:
-
-```env
-PORT=3000
-OLLAMA_URL=http://localhost:11434
-MODEL=gemma3:12b
-```
-
-### Environment Variables
-
-- `PORT` - Server port (default: 3000)
-- `OLLAMA_URL` - Ollama API URL (default: http://localhost:11434)
-- `MODEL` - Model name to use (default: gemma3:12b)
+- `PORT` – server port (default: 3000)
+- `GEMINI_API_KEY` – **required** Gemini API key (keep private)
+- `GEMINI_MODEL` – model name, e.g. `gemini-2.5-flash`, `gemini-2.5-pro`
 
 ## Usage
 
-1. Open your browser and navigate to `http://localhost:3000`
-2. Type your message in the input field
-3. Press Enter or click Send
-4. Wait for the AI response
-5. Continue the conversation
+1. Start the server: `npm start`
+2. Visit `http://localhost:3000`
+3. Chat in the UI; clear history with the Clear button
 
 ## API Endpoints
 
-### POST `/api/chat`
+- POST `/api/chat`
+  - Request: `{ "message": "hello" }`
+  - Response: `{ "success": true, "message": "...", "history": [...] }`
 
-Send a message and get a response.
+- POST `/api/clear`
+  - Clears conversation history
 
-**Request:**
-```json
-{
-  "message": "Your message here"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "AI response",
-  "history": [...]
-}
-```
-
-### POST `/api/clear`
-
-Clear the conversation history.
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Conversation cleared"
-}
-```
-
-### GET `/api/status`
-
-Check Ollama status and available models.
-
-**Response:**
-```json
-{
-  "ollama_running": true,
-  "model_available": true,
-  "available_models": ["gemma3:12b"],
-  "current_model": "gemma3:12b"
-}
-```
+- GET `/api/status`
+  - Returns Gemini connectivity, configured model, and available models
 
 ## Troubleshooting
 
-### Error: "Cannot connect to Ollama"
-
-- Make sure Ollama is running: `ollama serve`
-- Check that Ollama is accessible at `http://localhost:11434`
-- If using a different port, update the `OLLAMA_URL` in `.env`
-
-### Error: "Model not found"
-
-- Pull the Gemma3:12B model: `ollama pull gemma3:12b`
-- List available models: `ollama list`
-
-### Application is slow
-
-- Gemma3:12B requires significant processing power
-- Ensure your system has adequate RAM (16GB+ recommended)
-- GPU acceleration with Ollama is recommended for faster inference
+- **Cannot connect to Gemini / 403**: verify `GEMINI_API_KEY` and that your key has access to the chosen model.
+- **Model not available / 404**: set `GEMINI_MODEL` to one listed in `available_models` from `/api/status` (e.g., `gemini-2.5-flash`).
+- **Quoted keys**: ensure `.env` does not wrap the API key in quotes.
 
 ## Project Structure
 
 ```
 .
-├── server.js              # Express server and API routes
+├── server.js              # Express server and API routes (Gemini)
 ├── package.json           # Node dependencies
-├── .env                   # Environment configuration (optional)
+├── .env                   # Local secrets (not committed)
+├── .env.example           # Template with placeholders
 └── public/
     └── index.html         # Frontend UI
 ```
 
-## Technology Stack
+## Notes on secrets
 
-- **Frontend**: HTML5, CSS3, JavaScript
-- **Backend**: Node.js, Express.js
-- **AI/ML**: Ollama, Gemma3:12B
-- **HTTP Client**: Axios
+- Do not commit `.env` or real keys. Use placeholders in docs and `.env.example`.
+- `.gitignore` already excludes `.env` and `node_modules/`.
 
 ## License
 
 MIT
-
-## Support
-
-For issues with:
-- **Ollama**: Visit [ollama.ai](https://ollama.ai/)
-- **Gemma3**: See [Ollama model library](https://ollama.ai/library/gemma3)
-- **This project**: Check the GitHub repository
