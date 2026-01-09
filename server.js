@@ -6,14 +6,25 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent`;
 const GEMINI_LIST_URL = 'https://generativelanguage.googleapis.com/v1/models';
 
+// Parse multiple API keys from GEMINI_API_KEYS (comma-separated)
+const API_KEYS_STRING = process.env.GEMINI_API_KEYS || '';
+const API_KEYS = API_KEYS_STRING.split(',').map(k => k.trim()).filter(Boolean);
+let currentKeyIndex = 0;
+
 async function listModels(apiKey) {
   const res = await axios.get(`${GEMINI_LIST_URL}?key=${apiKey}`);
   return res.data.models || [];
+}
+
+function getNextApiKey() {
+  if (API_KEYS.length === 0) return null;
+  const key = API_KEYS[currentKeyIndex];
+  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
+  return key;
 }
 
 // Middleware
@@ -38,9 +49,9 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message cannot be empty' });
     }
 
-    if (!GEMINI_API_KEY) {
+    if (API_KEYS.length === 0) {
       return res.status(500).json({ 
-        error: 'Gemini API key is not configured. Please add GEMINI_API_KEY to your .env file' 
+        error: 'Gemini API keys are not configured. Please add GEMINI_API_KEYS to your .env file' 
       });
     }
 
@@ -56,44 +67,68 @@ app.post('/api/chat', async (req, res) => {
       parts: msg.parts
     }));
 
-    // Call Gemini API
-    const response = await axios.post(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
-      {
-        contents: contents,
-        generationConfig: {
-          temperature: 0.9,
-          topK: 1,
-          topP: 1,
-          maxOutputTokens: 2048,
+    let lastError = null;
+
+    for (let attempt = 0; attempt < API_KEYS.length; attempt++) {
+      const apiKey = getNextApiKey();
+
+      try {
+        console.log(`[Attempt ${attempt + 1}/${API_KEYS.length}] Using API key index ${currentKeyIndex === 0 ? API_KEYS.length - 1 : currentKeyIndex - 1}`);
+
+        const response = await axios.post(
+          `${GEMINI_API_URL}?key=${apiKey}`,
+          {
+            contents: contents,
+            generationConfig: {
+              temperature: 0.9,
+              topK: 1,
+              topP: 1,
+              maxOutputTokens: 2048,
+            }
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        const assistantMessage = response.data.candidates[0].content.parts[0].text.trim();
+
+        // Add assistant response to history
+        conversationHistory.push({
+          role: 'assistant',
+          parts: [{ text: assistantMessage }]
+        });
+
+        console.log('✅ Success with current key');
+
+        return res.json({
+          success: true,
+          message: assistantMessage,
+          history: conversationHistory
+        });
+      } catch (error) {
+        lastError = error;
+        console.error(`Attempt ${attempt + 1} failed:`, error.response?.status, error.response?.data?.error?.message || error.message);
+
+        // If 429 (rate limit), try next key
+        if (error.response?.status === 429) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
         }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
+
+        // For auth errors, break early
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          break;
         }
       }
-    );
+    }
 
-    const assistantMessage = response.data.candidates[0].content.parts[0].text.trim();
-
-    // Add assistant response to history
-    conversationHistory.push({
-      role: 'assistant',
-      parts: [{ text: assistantMessage }]
-    });
-
-    res.json({
-      success: true,
-      message: assistantMessage,
-      history: conversationHistory
-    });
-  } catch (error) {
-    console.error('Error calling Gemini API:', error.response?.data || error.message);
-
-    if (error.response?.status === 404) {
+    // All keys exhausted
+    if (lastError?.response?.status === 404) {
       try {
-        const models = await listModels(GEMINI_API_KEY);
+        const models = await listModels(API_KEYS[0]);
         const availableNames = (models || []).map(m => m.name);
         return res.status(404).json({
           error: `Model ${GEMINI_MODEL} not found. Available examples: ${availableNames.slice(0, 5).join(', ')}`
@@ -105,21 +140,24 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    if (error.response?.status === 400) {
+    if (lastError?.response?.status === 400) {
       return res.status(400).json({
-        error: 'Invalid API request: ' + (error.response.data.error?.message || 'Check your API key and request format')
+        error: 'Invalid API request: ' + (lastError.response.data.error?.message || 'Check your API key and request format')
       });
     }
 
-    if (error.response?.status === 403) {
+    if (lastError?.response?.status === 403) {
       return res.status(403).json({
-        error: 'Invalid or unauthorized API key. Please check your GEMINI_API_KEY in .env file'
+        error: 'Invalid or unauthorized API key. Please check your GEMINI_API_KEYS in .env file'
       });
     }
 
-    res.status(500).json({
-      error: 'Error processing your message: ' + (error.response?.data?.error?.message || error.message)
+    return res.status(500).json({
+      error: 'Failed after trying all keys: ' + (lastError?.response?.data?.error?.message || lastError?.message || 'Unknown error')
     });
+  } catch (error) {
+    console.error('Unexpected error:', error.message);
+    return res.status(500).json({ error: 'Unexpected server error' });
   }
 });
 
@@ -132,16 +170,17 @@ app.post('/api/clear', (req, res) => {
 // API route to check Gemini API status
 app.get('/api/status', async (req, res) => {
   try {
-    if (!GEMINI_API_KEY) {
+    if (API_KEYS.length === 0) {
       return res.json({
         api_configured: false,
         model_available: false,
-        error: 'Gemini API key is not configured'
+        total_keys: 0,
+        error: 'Gemini API keys are not configured'
       });
     }
 
-    // List models to confirm availability
-    const models = await listModels(GEMINI_API_KEY);
+    const primaryKey = API_KEYS[0];
+    const models = await listModels(primaryKey);
     const availableNames = models.map(m => m.name);
     const hasModel = availableNames.includes(`models/${GEMINI_MODEL}`) || availableNames.includes(GEMINI_MODEL);
 
@@ -149,15 +188,16 @@ app.get('/api/status', async (req, res) => {
       return res.json({
         api_configured: true,
         model_available: false,
+        total_keys: API_KEYS.length,
         available_models: availableNames,
         error: `Model ${GEMINI_MODEL} not available. Try one of: ${availableNames.slice(0, 5).join(', ')}`,
         status: 'disconnected'
       });
     }
 
-    // Test API connection with a simple request
+    // Test API connection with a simple request using the primary key
     await axios.post(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+      `${GEMINI_API_URL}?key=${primaryKey}`,
       {
         contents: [{ role: 'user', parts: [{ text: 'Hi' }] }]
       },
@@ -169,14 +209,16 @@ app.get('/api/status', async (req, res) => {
     res.json({
       api_configured: true,
       model_available: true,
+      total_keys: API_KEYS.length,
       available_models: availableNames,
       current_model: GEMINI_MODEL,
       status: 'connected'
     });
   } catch (error) {
     res.json({
-      api_configured: !!GEMINI_API_KEY,
+      api_configured: API_KEYS.length > 0,
       model_available: false,
+      total_keys: API_KEYS.length,
       error: error.response?.data?.error?.message || 'Cannot connect to Gemini API',
       status: 'disconnected'
     });
@@ -188,5 +230,5 @@ app.listen(PORT, () => {
   console.log(`🤖 Chatbot server running at http://localhost:${PORT}`);
   console.log(`🌐 Using Google Gemini API`);
   console.log(`🧠 Model: ${GEMINI_MODEL}`);
-  console.log(`🔑 API Key configured: ${GEMINI_API_KEY ? '✅ Yes' : '❌ No - Please add GEMINI_API_KEY to .env'}`);
+  console.log(`🔑 API Keys configured: ${API_KEYS.length > 0 ? `✅ ${API_KEYS.length} key(s)` : '❌ None - Please add GEMINI_API_KEYS to .env'}`);
 });
