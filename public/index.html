@@ -110,6 +110,12 @@
             animation: slideIn 0.25s ease-out;
         }
 
+        .message > div {
+            display: inline-flex;
+            flex-direction: column;
+            width: auto;
+        }
+
         @keyframes slideIn {
             from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
@@ -119,14 +125,15 @@
         .message.assistant { justify-content: flex-start; }
 
         .message-content {
-            max-width: 72%;
-            padding: 12px 14px;
+            padding: 10px 12px;
             border-radius: 14px;
             word-wrap: break-word;
-            line-height: 1.5;
+            line-height: 1.4;
             font-size: 14px;
             border: 1px solid var(--border);
             box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            display: inline-block;
+            max-width: 500px;
         }
 
         .user .message-content {
