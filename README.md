@@ -30,7 +30,7 @@ Create `.env` (use `.env.example` as a template):
 
 ```env
 PORT=3000
-GEMINI_API_KEY=your-gemini-api-key
+GEMINI_API_KEYS=key1,key2,key3,key4,key5
 GEMINI_MODEL=gemini-2.5-flash
 ```
 
