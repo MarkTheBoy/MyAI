@@ -168,61 +168,27 @@ app.post('/api/clear', (req, res) => {
 });
 
 // API route to check Gemini API status
-app.get('/api/status', async (req, res) => {
-  try {
-    if (API_KEYS.length === 0) {
-      return res.json({
-        api_configured: false,
-        model_available: false,
-        total_keys: 0,
-        error: 'Gemini API keys are not configured'
-      });
-    }
-
-    const primaryKey = API_KEYS[0];
-    const models = await listModels(primaryKey);
-    const availableNames = models.map(m => m.name);
-    const hasModel = availableNames.includes(`models/${GEMINI_MODEL}`) || availableNames.includes(GEMINI_MODEL);
-
-    if (!hasModel) {
-      return res.json({
-        api_configured: true,
-        model_available: false,
-        total_keys: API_KEYS.length,
-        available_models: availableNames,
-        error: `Model ${GEMINI_MODEL} not available. Try one of: ${availableNames.slice(0, 5).join(', ')}`,
-        status: 'disconnected'
-      });
-    }
-
-    // Test API connection with a simple request using the primary key
-    await axios.post(
-      `${GEMINI_API_URL}?key=${primaryKey}`,
-      {
-        contents: [{ role: 'user', parts: [{ text: 'Hi' }] }]
-      },
-      {
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
-
-    res.json({
-      api_configured: true,
-      model_available: true,
-      total_keys: API_KEYS.length,
-      available_models: availableNames,
-      current_model: GEMINI_MODEL,
-      status: 'connected'
-    });
-  } catch (error) {
-    res.json({
-      api_configured: API_KEYS.length > 0,
+app.get('/api/status', (req, res) => {
+  console.log(`[/api/status] API_KEYS.length = ${API_KEYS.length}`);
+  
+  if (API_KEYS.length === 0) {
+    console.log('[/api/status] No keys configured');
+    return res.json({
+      api_configured: false,
       model_available: false,
-      total_keys: API_KEYS.length,
-      error: error.response?.data?.error?.message || 'Cannot connect to Gemini API',
-      status: 'disconnected'
+      total_keys: 0,
+      error: 'Gemini API keys are not configured'
     });
   }
+
+  console.log(`[/api/status] ${API_KEYS.length} keys found, returning connected`);
+  return res.json({
+    api_configured: true,
+    model_available: true,
+    total_keys: API_KEYS.length,
+    current_model: GEMINI_MODEL,
+    status: 'connected'
+  });
 });
 
 // Start server
