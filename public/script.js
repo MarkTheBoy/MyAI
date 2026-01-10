@@ -7,7 +7,7 @@ let isLoading = false;
 let messageCount = 0;
 
 // Check Gemini status on load
-window.addEventListener('load', checkOllamaStatus);
+window.addEventListener('load', checkGeminiStatus);
 
 // Send message on Enter key
 messageInput.addEventListener('keypress', (e) => {
@@ -16,23 +16,23 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
-async function checkOllamaStatus() {
-try {
-const response = await fetch('/api/status');
-const data = await response.json();
+async function checkGeminiStatus() {
+    try {
+        const response = await fetch('/api/status');
+        const data = await response.json();
 
-if (data.api_configured && data.model_available) {
-    statusIndicator.classList.add('connected');
-    console.log('✅ Connected to Google Gemini API');
-} else if (!data.api_configured) {
-    showErrorMessage('❌ Gemini API key is not configured. Please add GEMINI_API_KEY to your .env file');
-} else {
-    showErrorMessage('❌ Cannot connect to Gemini API. Please check your API key.');
-}
-} catch (error) {
-console.error('Error checking status:', error);
-showErrorMessage('Cannot connect to server. Please make sure the server is running.');
-}
+    if (data.api_configured && data.model_available) {
+        statusIndicator.classList.add('connected');
+        console.log('✅ Connected to Google Gemini API');
+    } else if (!data.api_configured) {
+        showErrorMessage('❌ Gemini API key is not configured. Please add GEMINI_API_KEY to your .env file');
+    } else {
+        showErrorMessage('❌ Cannot connect to Gemini API. Please check your API key.');
+    }
+    } catch (error) {
+        console.error('Error checking status:', error);
+        showErrorMessage('Cannot connect to server. Please make sure the server is running.');
+    }
 }
 
 async function sendMessage() {
