@@ -1,3 +1,5 @@
+<img width="1919" height="900" alt="image" src="https://github.com/user-attachments/assets/4e96e8cd-a08b-4450-90fe-5bc6794c8840" />
+
 # Gemini Chatbot
 
 A JavaScript chatbot powered by Google Gemini API.
